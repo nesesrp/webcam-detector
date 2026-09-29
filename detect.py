@@ -3,6 +3,9 @@ import time
 import cv2
 from ultralytics import YOLO
 
+# Class ID of "person" in the COCO dataset
+PERSON_CLASS_ID = 0
+
 # Load the model (downloaded automatically on first run, "n" = nano, the fastest)
 model = YOLO("yolo11n.pt")
 
@@ -30,6 +33,11 @@ while True:
     fps = 1 / (now - prev_time)
     prev_time = now
     cv2.putText(annotated, f"FPS: {fps:.1f}", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    # Count detected people and draw the count on the frame
+    people_count = int((results[0].boxes.cls == PERSON_CLASS_ID).sum())
+    cv2.putText(annotated, f"People: {people_count}", (10, 70),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
     cv2.imshow("YOLO Webcam", annotated)
