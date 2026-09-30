@@ -2,3 +2,6 @@
 __pycache__/
 *.pt
 runs/
+
+# Screenshots and recordings
+captures/
