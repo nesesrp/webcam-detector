@@ -11,6 +11,7 @@ A beginner project for **real-time object detection** from a computer webcam usi
 - Save screenshots of the annotated frame with a single key press
 - Pause and resume the live view
 - Record the annotated video to an `.mp4` file
+- Session summary printed on exit (max people, most seen objects, average FPS)
 
 ## Tech Stack
 
@@ -51,6 +52,21 @@ python detect.py
 
 - Screenshots also work while paused, so you can freeze a moment and then save it.
 - Recordings use the FPS measured when recording starts, so playback runs at roughly real speed. Frames are not recorded while paused.
+- When you quit, a session summary is printed to the terminal:
+
+```
+=== Session Summary ===
+Duration: 01:35
+Frames processed: 960
+Average FPS: 12.0
+Max people at once: 3 (at 00:42)
+Most seen objects (share of frames they appeared in):
+  person: 94%
+  cup: 42%
+  cell phone: 12%
+Screenshots saved: 2
+Recordings saved: 1
+```
 
 You can tune detection in `detect.py`:
 
@@ -78,6 +94,7 @@ webcam-detector/
 - [x] Stable (averaged) FPS counter
 - [x] Screenshot capture
 - [x] Pause and video recording
+- [x] Session summary on exit
 - [ ] Object detection on a single image
 - [ ] Count people passing through a doorway using object tracking
 - [ ] Web interface with Streamlit

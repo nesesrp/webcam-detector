@@ -1,5 +1,5 @@
 import time
-from collections import deque
+from collections import Counter, deque
 from datetime import datetime
 from pathlib import Path
 
@@ -22,6 +22,42 @@ def capture_path(prefix, extension):
     return CAPTURES_DIR / f"{prefix}_{datetime.now():%Y%m%d_%H%M%S_%f}.{extension}"
 
 
+def format_duration(seconds):
+    """Format seconds as MM:SS."""
+    minutes, seconds = divmod(int(seconds), 60)
+    return f"{minutes:02d}:{seconds:02d}"
+
+
+def print_session_summary(stats):
+    """Print statistics collected during the session."""
+    duration = time.time() - stats["start_time"]
+    frames = stats["frames"]
+
+    print("\n=== Session Summary ===")
+    print(f"Duration: {format_duration(duration)}")
+    if frames == 0:
+        print("No frames were processed.")
+        return
+
+    print(f"Frames processed: {frames}")
+    print(f"Average FPS: {frames / stats['active_time']:.1f}")
+    if stats["max_people"] > 0:
+        print(f"Max people at once: {stats['max_people']} "
+              f"(at {format_duration(stats['max_people_at'])})")
+    else:
+        print("No people detected.")
+
+    if stats["class_frames"]:
+        print("Most seen objects (share of frames they appeared in):")
+        for name, count in stats["class_frames"].most_common(5):
+            print(f"  {name}: {count / frames:.0%}")
+    else:
+        print("No objects detected.")
+
+    print(f"Screenshots saved: {stats['screenshots']}")
+    print(f"Recordings saved: {stats['recordings']}")
+
+
 # Load the model (downloaded automatically on first run, "n" = nano, the fastest)
 model = YOLO("yolo11n.pt")
 
@@ -34,6 +70,18 @@ prev_time = time.time()
 frame_times = deque(maxlen=FPS_WINDOW)
 paused = False
 writer = None  # cv2.VideoWriter while recording, otherwise None
+
+# Statistics printed when the program exits
+stats = {
+    "start_time": time.time(),
+    "active_time": 0.0,  # Time spent processing frames, excluding pauses
+    "frames": 0,
+    "max_people": 0,
+    "max_people_at": 0.0,  # Seconds since start when max_people was reached
+    "class_frames": Counter(),  # Number of frames each class appeared in
+    "screenshots": 0,
+    "recordings": 0,
+}
 
 while True:
     # While paused, skip reading and detection so the last frame stays on screen
@@ -61,6 +109,15 @@ while True:
         people_count = int((results[0].boxes.cls == PERSON_CLASS_ID).sum())
         cv2.putText(annotated, f"People: {people_count}", (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        # Update session statistics
+        stats["frames"] += 1
+        stats["active_time"] += frame_times[-1]
+        if people_count > stats["max_people"]:
+            stats["max_people"] = people_count
+            stats["max_people_at"] = now - stats["start_time"]
+        detected_names = {results[0].names[int(c)] for c in results[0].boxes.cls}
+        stats["class_frames"].update(detected_names)
 
         if writer is not None:
             writer.write(annotated)
@@ -94,6 +151,7 @@ while True:
         filename = capture_path("capture", "jpg")
         cv2.imwrite(str(filename), annotated)
         print(f"Saved {filename}")
+        stats["screenshots"] += 1
 
     # Press 'r' to start or stop recording
     if key == ord("r"):
@@ -106,6 +164,7 @@ while True:
                                      record_fps, (width, height))
             if writer.isOpened():
                 print(f"Recording to {filename} at {record_fps} FPS")
+                stats["recordings"] += 1
             else:
                 print("Could not start recording.")
                 writer = None
@@ -122,3 +181,5 @@ if writer is not None:
     writer.release()
 cap.release()
 cv2.destroyAllWindows()
+
+print_session_summary(stats)
