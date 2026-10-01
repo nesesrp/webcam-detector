@@ -9,6 +9,7 @@ A beginner project for **real-time object detection** from a computer webcam usi
 - Bounding boxes, labels and confidence scores drawn on each frame
 - Live FPS counter (averaged over recent frames for a stable reading)
 - Live counter showing the number of people on screen
+- Adjust the confidence threshold live with the keyboard
 - Save screenshots of the annotated frame with a single key press
 - Pause and resume the live view
 - Record the annotated video to an `.mp4` file
@@ -57,6 +58,7 @@ python detect.py
 | Key | Action |
 |---|---|
 | `p` | Pause / resume the live view |
+| `+` / `-` | Raise / lower the confidence threshold by 0.05 |
 | `s` | Save a screenshot of the current frame to `captures/` |
 | `r` | Start / stop recording an `.mp4` video to `captures/` |
 | `q` | Quit |

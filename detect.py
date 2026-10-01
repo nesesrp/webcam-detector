@@ -13,6 +13,10 @@ PERSON_CLASS_ID = 0
 # Number of recent frames used to average the FPS (higher = smoother but slower to react)
 FPS_WINDOW = 20
 
+# How much the confidence threshold changes per '+' / '-' key press, and its allowed range
+CONF_STEP = 0.05
+CONF_MIN, CONF_MAX = 0.05, 0.95
+
 # Folder where screenshots and recordings are saved
 CAPTURES_DIR = Path("captures")
 
@@ -101,6 +105,7 @@ cap = cv2.VideoCapture(args.camera)
 if not cap.isOpened():
     raise RuntimeError("Could not open camera. Check System Settings > Privacy > Camera permissions.")
 
+conf = args.conf  # Can be changed at runtime with '+' / '-'
 prev_time = time.time()
 frame_times = deque(maxlen=FPS_WINDOW)
 paused = False
@@ -127,7 +132,7 @@ while True:
             break
 
         # Run detection (conf: minimum confidence score, imgsz: smaller = faster)
-        results = model(frame, conf=args.conf, imgsz=args.imgsz, classes=class_ids, verbose=False)
+        results = model(frame, conf=conf, imgsz=args.imgsz, classes=class_ids, verbose=False)
 
         # Draw boxes and labels on the frame
         annotated = results[0].plot()
@@ -143,6 +148,8 @@ while True:
         # Count detected people and draw the count on the frame
         people_count = int((results[0].boxes.cls == PERSON_CLASS_ID).sum())
         cv2.putText(annotated, f"People: {people_count}", (10, 70),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(annotated, f"Conf: {conf:.2f}", (10, 110),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
         # Update session statistics
@@ -165,7 +172,7 @@ while True:
         cv2.putText(display, "REC", (width - 85, 35),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
     if paused:
-        cv2.putText(display, "PAUSED", (10, 110),
+        cv2.putText(display, "PAUSED", (10, 150),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
 
     cv2.imshow("YOLO Webcam", display)
@@ -180,6 +187,12 @@ while True:
             # Reset timing so the pause doesn't drag the FPS average down
             prev_time = time.time()
             frame_times.clear()
+
+    # Press '+' (or '=' so Shift isn't needed) / '-' to raise or lower the confidence threshold
+    if key in (ord("+"), ord("="), ord("-")):
+        step = -CONF_STEP if key == ord("-") else CONF_STEP
+        conf = round(min(CONF_MAX, max(CONF_MIN, conf + step)), 2)
+        print(f"Confidence threshold: {conf:.2f}")
 
     # Press 's' to save the current annotated frame
     if key == ord("s"):
