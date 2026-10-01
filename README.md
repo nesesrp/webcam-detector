@@ -5,6 +5,7 @@ A beginner project for **real-time object detection** from a computer webcam usi
 ## Features
 
 - Real-time object detection with a webcam
+- Command-line options for camera, model, confidence, image size and class filtering
 - Bounding boxes, labels and confidence scores drawn on each frame
 - Live FPS counter (averaged over recent frames for a stable reading)
 - Live counter showing the number of people on screen
@@ -40,6 +41,16 @@ python detect.py
 ```
 
 - The model weights (`yolo11n.pt`) are downloaded automatically on the first run.
+- Optional command-line options (run `python detect.py --help` for details):
+
+| Option | Default | Description |
+|---|---|---|
+| `--camera` | `0` | Camera index to open |
+| `--model` | `yolo11n.pt` | YOLO model weights to load |
+| `--conf` | `0.5` | Minimum confidence score (0–1) |
+| `--imgsz` | `320` | Inference image size, smaller = faster |
+| `--classes` | all | Only detect these classes, e.g. `--classes person cup` |
+
 - On macOS, allow camera access for your terminal or editor when prompted (System Settings → Privacy & Security → Camera).
 - Keyboard controls:
 

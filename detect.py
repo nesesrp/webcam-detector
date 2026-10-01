@@ -1,3 +1,4 @@
+import argparse
 import time
 from collections import Counter, deque
 from datetime import datetime
@@ -26,6 +27,37 @@ def format_duration(seconds):
     """Format seconds as MM:SS."""
     minutes, seconds = divmod(int(seconds), 60)
     return f"{minutes:02d}:{seconds:02d}"
+
+
+def parse_args():
+    """Parse command-line options."""
+    parser = argparse.ArgumentParser(description="Real-time object detection from a webcam.")
+    parser.add_argument("--camera", type=int, default=0,
+                        help="camera index to open (default: 0)")
+    parser.add_argument("--model", default="yolo11n.pt",
+                        help="YOLO model weights to load (default: yolo11n.pt)")
+    parser.add_argument("--conf", type=float, default=0.5,
+                        help="minimum confidence score, between 0 and 1 (default: 0.5)")
+    parser.add_argument("--imgsz", type=int, default=320,
+                        help="inference image size, smaller = faster (default: 320)")
+    parser.add_argument("--classes", nargs="+", metavar="NAME",
+                        help="only detect these classes, e.g. --classes person cup")
+    args = parser.parse_args()
+    if not 0 < args.conf <= 1:
+        parser.error("--conf must be between 0 and 1")
+    return args
+
+
+def resolve_class_ids(model, class_names):
+    """Convert class names like "person" to the model's class IDs."""
+    if not class_names:
+        return None
+    ids_by_name = {name: class_id for class_id, name in model.names.items()}
+    unknown = [name for name in class_names if name not in ids_by_name]
+    if unknown:
+        raise SystemExit(f"Unknown class name(s): {', '.join(unknown)}\n"
+                         f"Available: {', '.join(sorted(ids_by_name))}")
+    return [ids_by_name[name] for name in class_names]
 
 
 def print_session_summary(stats):
@@ -58,11 +90,14 @@ def print_session_summary(stats):
     print(f"Recordings saved: {stats['recordings']}")
 
 
+args = parse_args()
+
 # Load the model (downloaded automatically on first run, "n" = nano, the fastest)
-model = YOLO("yolo11n.pt")
+model = YOLO(args.model)
+class_ids = resolve_class_ids(model, args.classes)
 
 # Open the webcam (0 = default camera)
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(args.camera)
 if not cap.isOpened():
     raise RuntimeError("Could not open camera. Check System Settings > Privacy > Camera permissions.")
 
@@ -92,7 +127,7 @@ while True:
             break
 
         # Run detection (conf: minimum confidence score, imgsz: smaller = faster)
-        results = model(frame, conf=0.5, imgsz=320, verbose=False)
+        results = model(frame, conf=args.conf, imgsz=args.imgsz, classes=class_ids, verbose=False)
 
         # Draw boxes and labels on the frame
         annotated = results[0].plot()
