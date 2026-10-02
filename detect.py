@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import cv2
+import numpy as np
 from ultralytics import YOLO
 
 # Class ID of "person" in the COCO dataset
@@ -16,6 +17,10 @@ FPS_WINDOW = 20
 # How much the confidence threshold changes per '+' / '-' key press, and its allowed range
 CONF_STEP = 0.05
 CONF_MIN, CONF_MAX = 0.05, 0.95
+
+# Heatmap look: blur size (odd number) to smooth box edges, and overlay opacity
+HEATMAP_BLUR = 51
+HEATMAP_ALPHA = 0.5
 
 # Folder where screenshots and recordings are saved
 CAPTURES_DIR = Path("captures")
@@ -31,6 +36,28 @@ def format_duration(seconds):
     """Format seconds as MM:SS."""
     minutes, seconds = divmod(int(seconds), 60)
     return f"{minutes:02d}:{seconds:02d}"
+
+
+def add_to_heatmap(heat, boxes):
+    """Add 1 to every pixel covered by a detection box."""
+    height, width = heat.shape
+    for x1, y1, x2, y2 in boxes.xyxy.int().tolist():
+        heat[max(0, y1):min(height, y2), max(0, x1):min(width, x2)] += 1
+
+
+def draw_heatmap(frame, heat):
+    """Return a copy of the frame with the heatmap blended over areas that had detections."""
+    if heat.max() == 0:
+        return frame.copy()
+    smoothed = cv2.GaussianBlur(heat, (HEATMAP_BLUR, HEATMAP_BLUR), 0)
+    normalized = (smoothed / smoothed.max() * 255).astype(np.uint8)
+    colored = cv2.applyColorMap(normalized, cv2.COLORMAP_JET)
+    blended = cv2.addWeighted(frame, 1 - HEATMAP_ALPHA, colored, HEATMAP_ALPHA, 0)
+    # Only tint pixels that were actually covered, so empty areas keep their original colors
+    mask = normalized > 0
+    output = frame.copy()
+    output[mask] = blended[mask]
+    return output
 
 
 def parse_args():
@@ -92,6 +119,8 @@ def print_session_summary(stats):
 
     print(f"Screenshots saved: {stats['screenshots']}")
     print(f"Recordings saved: {stats['recordings']}")
+    if stats["heatmap_file"]:
+        print(f"Heatmap saved: {stats['heatmap_file']}")
 
 
 args = parse_args()
@@ -110,6 +139,8 @@ prev_time = time.time()
 frame_times = deque(maxlen=FPS_WINDOW)
 paused = False
 writer = None  # cv2.VideoWriter while recording, otherwise None
+heat = None  # Per-pixel count of how often it was inside a detection box
+show_heatmap = False
 
 # Statistics printed when the program exits
 stats = {
@@ -121,6 +152,7 @@ stats = {
     "class_frames": Counter(),  # Number of frames each class appeared in
     "screenshots": 0,
     "recordings": 0,
+    "heatmap_file": None,
 }
 
 while True:
@@ -134,8 +166,15 @@ while True:
         # Run detection (conf: minimum confidence score, imgsz: smaller = faster)
         results = model(frame, conf=conf, imgsz=args.imgsz, classes=class_ids, verbose=False)
 
-        # Draw boxes and labels on the frame
+        # Accumulate where objects appear (also while the heatmap is hidden)
+        if heat is None:
+            heat = np.zeros(frame.shape[:2], dtype=np.float32)
+        add_to_heatmap(heat, results[0].boxes)
+
+        # Draw boxes and labels on the frame, with the heatmap underneath if enabled
         annotated = results[0].plot()
+        if show_heatmap:
+            annotated = draw_heatmap(annotated, heat)
 
         # Calculate FPS as an average over the last frames so the value doesn't flicker
         now = time.time()
@@ -194,6 +233,11 @@ while True:
         conf = round(min(CONF_MAX, max(CONF_MIN, conf + step)), 2)
         print(f"Confidence threshold: {conf:.2f}")
 
+    # Press 'h' to show or hide the heatmap (takes effect on the next frame)
+    if key == ord("h"):
+        show_heatmap = not show_heatmap
+        print(f"Heatmap {'on' if show_heatmap else 'off'}")
+
     # Press 's' to save the current annotated frame
     if key == ord("s"):
         filename = capture_path("capture", "jpg")
@@ -229,5 +273,11 @@ if writer is not None:
     writer.release()
 cap.release()
 cv2.destroyAllWindows()
+
+# Save the heatmap of the whole session over the last camera frame
+if heat is not None and heat.max() > 0:
+    filename = capture_path("heatmap", "jpg")
+    cv2.imwrite(str(filename), draw_heatmap(frame, heat))
+    stats["heatmap_file"] = filename
 
 print_session_summary(stats)

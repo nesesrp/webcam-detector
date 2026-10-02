@@ -11,6 +11,7 @@ A beginner project for **real-time object detection** from a computer webcam usi
 - Live counter showing the number of people on screen
 - Adjust the confidence threshold live with the keyboard
 - Save screenshots of the annotated frame with a single key press
+- Heatmap overlay showing where objects appeared most often
 - Pause and resume the live view
 - Record the annotated video to an `.mp4` file
 - Session summary printed on exit (max people, most seen objects, average FPS)
@@ -59,12 +60,14 @@ python detect.py
 |---|---|
 | `p` | Pause / resume the live view |
 | `+` / `-` | Raise / lower the confidence threshold by 0.05 |
+| `h` | Show / hide the heatmap overlay |
 | `s` | Save a screenshot of the current frame to `captures/` |
 | `r` | Start / stop recording an `.mp4` video to `captures/` |
 | `q` | Quit |
 
 - Screenshots also work while paused, so you can freeze a moment and then save it.
 - Recordings use the FPS measured when recording starts, so playback runs at roughly real speed. Frames are not recorded while paused.
+- The heatmap counts how often each pixel was inside a detection box, so the hottest (red) areas are where objects spent the most time. It respects `--classes`, keeps collecting while hidden, and is also visible in screenshots and recordings when turned on. On exit, the heatmap of the whole session is saved to `captures/`.
 - When you quit, a session summary is printed to the terminal:
 
 ```
@@ -79,6 +82,7 @@ Most seen objects (share of frames they appeared in):
   cell phone: 12%
 Screenshots saved: 2
 Recordings saved: 1
+Heatmap saved: captures/heatmap_20261002_221530_123456.jpg
 ```
 
 You can tune detection in `detect.py`:
@@ -88,13 +92,15 @@ You can tune detection in `detect.py`:
 | `conf` | `0.5` | Minimum confidence score; raise it to reduce false positives |
 | `imgsz` | `320` | Input size; smaller is faster, larger is more accurate |
 | `FPS_WINDOW` | `20` | Number of recent frames used to average the FPS |
+| `HEATMAP_BLUR` | `51` | Blur size that smooths the heatmap (odd number) |
+| `HEATMAP_ALPHA` | `0.5` | Heatmap overlay opacity (0–1) |
 
 ## Project Structure
 
 ```
 webcam-detector/
 ├── detect.py          # Real-time webcam detection
-├── captures/          # Screenshots and recordings (created on first save, git-ignored)
+├── captures/          # Screenshots, recordings and heatmaps (created on first save, git-ignored)
 ├── requirements.txt
 └── README.md
 ```
@@ -108,6 +114,7 @@ webcam-detector/
 - [x] Screenshot capture
 - [x] Pause and video recording
 - [x] Session summary on exit
+- [x] Detection heatmap
 - [ ] Object detection on a single image
 - [ ] Count people passing through a doorway using object tracking
 - [ ] Web interface with Streamlit
